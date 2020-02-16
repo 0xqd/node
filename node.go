@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -145,21 +146,23 @@ func handleMsg(msg_in_chan chan string, msg_out_chan chan string) {
 			Genesis_Account := block.AccountFromString(addr)
 
 			tx := block.Tx{Nonce: randNonce, Amount: amount, Sender: Genesis_Account, Receiver: account}
-			log.Println("tx >>> ", tx)
+			//log.Println("tx >>> ", tx)
 
 			tx = crypto.SignTxAdd(tx, keypair)
 			reply := chain.HandleTx(tx)
-			log.Println("resp > ", reply)
+			//log.Println("resp > ", reply)
 
 			msg_out_chan <- reply
 
-		case protocol.CMD_GETTXPOOL:
-			log.Println("get tx pool")
+		//case protocol.CMD_GETTXPOOL:
+		//	log.Println("get tx pool")
 
 		//case CMD_GETBLOCKS:
 
 		case protocol.CMD_TX:
 			log.Println("Handle tx")
+
+			//TODO
 
 			// 	dataBytes := msg.Data
 			// 	log.Println("data ", dataBytes)
@@ -328,11 +331,58 @@ func runweb() {
 
 }
 
-/*
-start node listening for incoming requests
-*/
-func main() {
+type Pubsub struct {
+	mu     sync.RWMutex
+	subs   map[string][]chan string
+	closed bool
+}
 
+func NewPubsub() *Pubsub {
+	ps := &Pubsub{}
+	ps.subs = make(map[string][]chan string)
+	ps.closed = false
+	return ps
+}
+
+func (ps *Pubsub) Subscribe(topic string) <-chan string {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	ch := make(chan string, 1)
+	ps.subs[topic] = append(ps.subs[topic], ch)
+	return ch
+}
+
+func (ps *Pubsub) Publish(topic string, msg string) {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+
+	if ps.closed {
+		return
+	}
+
+	for _, ch := range ps.subs[topic] {
+		go func(ch chan string) {
+			ch <- msg
+		}(ch)
+	}
+}
+
+func (ps *Pubsub) Close() {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if !ps.closed {
+		ps.closed = true
+		for _, subs := range ps.subs {
+			for _, ch := range subs {
+				close(ch)
+			}
+		}
+	}
+}
+
+func runnode() {
 	log.Println("run node")
 
 	//TODO signatures of genesis
@@ -353,4 +403,57 @@ func main() {
 	runweb()
 	//log.Println("Server running")
 
+}
+
+func runpub1(pub func(topic string, msg string)) {
+	for t := range time.NewTicker(2 * time.Second).C {
+		pub("tx", string(t.Format("20200102150405"))+" "+strconv.Itoa(len(chain.Tx_pool)))
+	}
+}
+
+func runpub2(pub func(topic string, msg string)) {
+	for t := range time.NewTicker(2 * time.Second).C {
+		pub("block", string(t.Format("20200102150405"))+" "+strconv.Itoa(len(chain.Blocks)))
+	}
+}
+
+func pubsubexample() {
+
+	ps := NewPubsub()
+	ch1 := ps.Subscribe("tx")
+	ch2 := ps.Subscribe("block")
+
+	listener := func(name string, ch <-chan string) {
+		for i := range ch {
+			fmt.Printf("[%s] got %s\n", name, i)
+		}
+		fmt.Printf("[%s] done\n", name)
+	}
+
+	go listener("1", ch1)
+	go listener("2", ch2)
+
+	pub := func(topic string, msg string) {
+		fmt.Printf("Publishing @%s: %s\n", topic, msg)
+		ps.Publish(topic, msg)
+		//time.Sleep(1 * time.Millisecond)
+	}
+
+	pub("block", string(strconv.Itoa(len(chain.Blocks))))
+
+	//TODO go routine
+	go runpub1(pub)
+	go runpub2(pub)
+
+	log.Println("??????????????????")
+
+	// time.Sleep(1000 * time.Millisecond)
+	// log.Println("closing")
+	ps.Close()
+}
+
+//start node listening for incoming requests
+func main() {
+	go pubsubexample()
+	runnode()
 }
