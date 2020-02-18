@@ -88,16 +88,6 @@ func ListenAll() error {
 	}
 }
 
-func Reply(rw *bufio.ReadWriter, resp string) {
-	response := protocol.EncodeReply(resp)
-	n, err := rw.WriteString(response)
-	if err != nil {
-		log.Println(err, n)
-		//err:= errors.Wrap(err, "Could not write GOB data ("+strconv.Itoa(n)+" bytes written)")
-	}
-	rw.Flush()
-}
-
 func ReadMessage(rw *bufio.ReadWriter) protocol.Message {
 	var msg protocol.Message
 	msgString := protocol.ReadStream(rw)
@@ -230,7 +220,7 @@ func HandleMsg(req_chan chan string, rep_chan chan string) {
 	}
 }
 
-func requestReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan string) {
+func ReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan string) {
 
 	//continously read for requests and respond with reply
 	for {
@@ -248,7 +238,7 @@ func requestReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan 
 		//take from reply channel and send over network
 		reply := <-rep_chan
 		nlog.Println("msg out ", reply)
-		Reply(rw, reply)
+		protocol.NetworkReply(rw, reply)
 
 	}
 }
@@ -271,7 +261,7 @@ func channelNetwork(conn net.Conn) {
 
 	//REQUEST<>REPLY protocol only so far
 
-	go requestReplyLoop(rw, req_chan, rep_chan)
+	go ReplyLoop(rw, req_chan, rep_chan)
 
 	//go publishLoop(rw, msg_in_chan, msg_out_chan)
 

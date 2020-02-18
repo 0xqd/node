@@ -127,8 +127,18 @@ func RandomTx(account_s block.Account) block.Tx {
 	return testTx
 }
 
+func NetworkReply(rw *bufio.ReadWriter, resp string) {
+	response := EncodeReply(resp)
+	n, err := rw.WriteString(response)
+	if err != nil {
+		log.Println(err, n)
+		//err:= errors.Wrap(err, "Could not write GOB data ("+strconv.Itoa(n)+" bytes written)")
+	}
+	rw.Flush()
+}
+
 //TODO convert to chan
-func RequestReply(rw *bufio.ReadWriter, req_msg string) string {
+func NetworkRequestReply(rw *bufio.ReadWriter, req_msg string) string {
 	//REQUEST
 	WritePipe(rw, req_msg)
 
