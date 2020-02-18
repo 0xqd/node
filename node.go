@@ -88,16 +88,6 @@ func ListenAll() error {
 	}
 }
 
-func ReadMessage(rw *bufio.ReadWriter) protocol.Message {
-	var msg protocol.Message
-	msgString := protocol.ReadStream(rw)
-	if msgString == protocol.EMPTY_MSG {
-		return protocol.EmptyMsg()
-	}
-	msg = protocol.ParseMessage(msgString)
-	return msg
-}
-
 func putMsg(msg_in_chan chan string, msg string) {
 	msg_in_chan <- msg
 }
@@ -226,7 +216,7 @@ func ReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan string)
 	for {
 
 		// read from network
-		msgString := protocol.ReadStream(rw)
+		msgString := protocol.NReadStream(rw)
 		nlog.Print("Receive message over network ", msgString)
 
 		//put in the channel
@@ -239,7 +229,7 @@ func ReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan string)
 		reply := <-rep_chan
 		nlog.Println("msg out ", reply)
 		response := protocol.EncodeReply(reply)
-		protocol.NetworkWrite(rw, response)
+		protocol.NWrite(rw, response)
 
 	}
 }

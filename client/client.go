@@ -166,7 +166,7 @@ func RequestLoop(rw *bufio.ReadWriter, msg_in_chan chan string, msg_out_chan cha
 		request := <-msg_in_chan
 		fmt.Println("request ", request)
 
-		resp_msg := protocol.NetworkRequestReply(rw, request)
+		resp_msg := protocol.NRequestReply(rw, request)
 		fmt.Println("resp_msg ", resp_msg)
 
 		msg_out_chan <- resp_msg

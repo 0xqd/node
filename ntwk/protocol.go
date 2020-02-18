@@ -32,7 +32,7 @@ const (
 
 //given a sream read from it
 //TODO proper error handling
-func ReadStream(rw *bufio.ReadWriter) string {
+func NReadStream(rw *bufio.ReadWriter) string {
 	msg, err := rw.ReadString(DELIM)
 	if err != nil {
 		//issue
@@ -46,6 +46,16 @@ func ReadStream(rw *bufio.ReadWriter) string {
 			return ERROR_READ
 		}
 	}
+	return msg
+}
+
+func NReadMessage(rw *bufio.ReadWriter) Message {
+	var msg Message
+	msgString := NReadStream(rw)
+	if msgString == EMPTY_MSG {
+		return EmptyMsg()
+	}
+	msg = ParseMessage(msgString)
 	return msg
 }
 
@@ -71,7 +81,7 @@ func ParseMessage(msgString string) Message {
 	return msg
 }
 
-func ReadMsg(rw *bufio.ReadWriter) string {
+func NReadMsg(rw *bufio.ReadWriter) string {
 	//TODO handle err
 	msg, _ := rw.ReadString(DELIM)
 	msg = strings.Trim(msg, string(DELIM))
@@ -90,18 +100,19 @@ func EncodeMessageTx(txJson []byte) string {
 	return msg
 }
 
-//TODO convert to chan
-func NetworkRequestReply(rw *bufio.ReadWriter, req_msg string) string {
+//TODO
+func NRequestReply(rw *bufio.ReadWriter, req_msg string) string {
 	//REQUEST
-	NetworkWrite(rw, req_msg)
+	//TODO msg type
+	NWrite(rw, req_msg)
 
 	//REPLY
-	resp_msg := ReadMsg(rw)
+	resp_msg := NReadMsg(rw)
 
 	return resp_msg
 }
 
-func NetworkWrite(rw *bufio.ReadWriter, message string) error {
+func NWrite(rw *bufio.ReadWriter, message string) error {
 	n, err := rw.WriteString(message)
 	if err != nil {
 		return errors.Wrap(err, "Could not write data ("+strconv.Itoa(n)+" bytes written)")
@@ -120,11 +131,12 @@ func ConstructMessage(cmd string) string {
 	return msg
 }
 
+//TODO
 //request account address
-func ReceiveAccount(rw *bufio.ReadWriter) error {
-	log.Println("RequestAccount ", CMD_RANDOM_ACCOUNT)
-	return nil
-}
+// func NReceiveAccount(rw *bufio.ReadWriter) error {
+// 	log.Println("RequestAccount ", CMD_RANDOM_ACCOUNT)
+// 	return nil
+// }
 
 //generic request<->reply
 func RequestReplyChan(request string, msg_in_chan chan string, msg_out_chan chan string) string {
@@ -171,6 +183,6 @@ func RandomTx(account_s block.Account) block.Tx {
 //request random account address
 // func RequestRandomAccount(rw *bufio.ReadWriter) error {
 // 	msg := ConstructMessage(CMD_RANDOM_ACCOUNT)
-// 	error := NetworkWrite(rw, msg)
+// 	error := NWrite(rw, msg)
 // 	return error
 // }
