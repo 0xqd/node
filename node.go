@@ -20,21 +20,25 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/polygonledger/node/block"
-	chain "github.com/polygonledger/node/chain"
+	"github.com/polygonledger/node/chain"
 	"github.com/polygonledger/node/crypto"
 	protocol "github.com/polygonledger/node/ntwk"
 )
 
+var nlog *log.Logger
 var Peers []protocol.Peer
+var logfile_name = "node.log"
 
 func addpeer(addr string) {
 	p := protocol.Peer{Address: addr}
@@ -45,7 +49,7 @@ func addpeer(addr string) {
 func setupPeer(addr string, conn net.Conn) {
 	addpeer(addr)
 
-	log.Println("setup channels for incoming requests")
+	nlog.Println("setup channels for incoming requests")
 	go channelNetwork(conn)
 }
 
@@ -61,21 +65,21 @@ func ListenAll() error {
 	}
 
 	addr := listener.Addr().String()
-	log.Println("Listen on", addr)
+	nlog.Println("Listen on", addr)
 
 	//TODO check if peers are alive see
 	//https://stackoverflow.com/questions/12741386/how-to-know-tcp-connection-is-closed-in-net-package
 	//https://gist.github.com/elico/3eecebd87d4bc714c94066a1783d4c9c
 
 	for {
-		log.Println("Accept a connection request")
+		nlog.Println("Accept a connection request")
 
 		conn, err := listener.Accept()
 		strRemoteAddr := conn.RemoteAddr().String()
 
 		log.Println("accepted conn ", strRemoteAddr)
 		if err != nil {
-			log.Println("Failed accepting a connection request:", err)
+			nlog.Println("Failed accepting a connection request:", err)
 			continue
 		}
 
@@ -115,25 +119,25 @@ func HandlePing(msg_out_chan chan string) {
 }
 
 func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
-	log.Println("Handle ", msg.Command)
+	nlog.Println("Handle ", msg.Command)
 
 	switch msg.Command {
 
 	case protocol.CMD_PING:
-		log.Println("PING PONG")
+		nlog.Println("PING PONG")
 		HandlePing(rep_chan)
 
 	case protocol.CMD_BALANCE:
-		log.Println("Handle balance")
+		nlog.Println("Handle balance")
 
 		dataBytes := msg.Data
-		log.Println("data ", dataBytes)
+		nlog.Println("data ", dataBytes)
 		var account block.Account
 
 		if err := json.Unmarshal(dataBytes, &account); err != nil {
 			panic(err)
 		}
-		log.Println("get balance for account ", account)
+		nlog.Println("get balance for account ", account)
 
 		balance := chain.Accounts[account]
 		s := strconv.Itoa(balance)
@@ -147,7 +151,7 @@ func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
 		if err := json.Unmarshal(dataBytes, &account); err != nil {
 			panic(err)
 		}
-		log.Println("faucet for ... ", account)
+		nlog.Println("faucet for ... ", account)
 
 		randNonce := 0
 		amount := 10
@@ -161,12 +165,12 @@ func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
 
 		tx = crypto.SignTxAdd(tx, keypair)
 		reply := chain.HandleTx(tx)
-		log.Println("resp > ", reply)
+		nlog.Println("resp > ", reply)
 
 		rep_chan <- reply
 
 	case protocol.CMD_GETTXPOOL:
-		log.Println("get tx pool")
+		nlog.Println("get tx pool")
 
 		//TODO
 		data, _ := json.Marshal(chain.Tx_pool)
@@ -178,7 +182,7 @@ func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
 	//case CMD_GETBLOCKS:
 
 	case protocol.CMD_TX:
-		log.Println("Handle tx")
+		nlog.Println("Handle tx")
 
 		dataBytes := msg.Data
 
@@ -187,7 +191,7 @@ func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
 		if err := json.Unmarshal(dataBytes, &tx); err != nil {
 			panic(err)
 		}
-		log.Println(">> ", tx)
+		nlog.Println(">> ", tx)
 
 		resp := chain.HandleTx(tx)
 		rep_chan <- resp
@@ -199,7 +203,7 @@ func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
 	// 	Reply(rw, string(txJson))
 
 	default:
-		log.Println("unknown cmd ", msg.Command)
+		nlog.Println("unknown cmd ", msg.Command)
 		resp := "ERROR UNKONWN CMD"
 		rep_chan <- resp
 	}
@@ -208,10 +212,10 @@ func HandleReqMsg(msg protocol.Message, rep_chan chan string) {
 //handle messages
 func HandleMsg(req_chan chan string, rep_chan chan string) {
 	msgString := <-req_chan
-	fmt.Println("handle msg string ", msgString)
+	nlog.Println("handle msg string ", msgString)
 
 	if msgString == protocol.EMPTY_MSG {
-		fmt.Println("empty msg")
+		nlog.Println("empty msg")
 		return
 	}
 
@@ -222,7 +226,7 @@ func HandleMsg(req_chan chan string, rep_chan chan string) {
 	if req_msg.MessageType == protocol.REQ {
 		HandleReqMsg(req_msg, rep_chan)
 	} else if req_msg.MessageType == protocol.REP {
-		log.Println("handle reply")
+		nlog.Println("handle reply")
 	}
 }
 
@@ -233,7 +237,7 @@ func requestReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan 
 
 		// read from network
 		msgString := protocol.ReadStream(rw)
-		log.Print("Receive message over network ", msgString)
+		nlog.Print("Receive message over network ", msgString)
 
 		//put in the channel
 		go putMsg(req_chan, msgString)
@@ -243,7 +247,7 @@ func requestReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan 
 
 		//take from reply channel and send over network
 		reply := <-rep_chan
-		fmt.Println("msg out ", reply)
+		nlog.Println("msg out ", reply)
 		Reply(rw, reply)
 
 	}
@@ -335,7 +339,7 @@ func runweb() {
 }
 
 func run_node() {
-	log.Println("run node")
+	nlog.Println("run node")
 
 	//TODO signatures of genesis
 	chain.InitAccounts()
@@ -352,12 +356,38 @@ func run_node() {
 
 }
 
+func setupLogfile() *log.Logger {
+	//setup log file
+
+	logFile, err := os.OpenFile(logfile_name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//defer logfile.Close()
+
+	mw := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(mw)
+
+	//logger := log.New(logFile, "", log.LstdFlags)
+	logger := log.New(logFile, "node ", log.LstdFlags)
+	logger.SetOutput(mw)
+
+	//log.SetOutput(file)
+
+	return logger
+
+}
+
 // start node listening for incoming requests
 func main() {
 
+	nlog = setupLogfile()
+	nlog.Println("set log")
+
 	run_node()
 
-	log.Println("node running")
+	//log.Println("node running")
 
 	runweb()
 
