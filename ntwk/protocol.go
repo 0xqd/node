@@ -86,13 +86,54 @@ func EncodeReply(resp string) string {
 
 func EncodeMessageTx(txJson []byte) string {
 	//emptyData := ""
-	msgCmd := "TX"
-	//TODO check
-	msg := EncodeMsg(REQ, msgCmd, string(txJson))
+	msg := EncodeMsg(REQ, CMD_TX, string(txJson))
 	return msg
 }
 
-//handlers TODO this is higher level and should be somewhere else
+//TODO convert to chan
+func NetworkRequestReply(rw *bufio.ReadWriter, req_msg string) string {
+	//REQUEST
+	NetworkWrite(rw, req_msg)
+
+	//REPLY
+	resp_msg := ReadMsg(rw)
+
+	return resp_msg
+}
+
+func NetworkWrite(rw *bufio.ReadWriter, message string) error {
+	n, err := rw.WriteString(message)
+	if err != nil {
+		return errors.Wrap(err, "Could not write data ("+strconv.Itoa(n)+" bytes written)")
+	} else {
+		log.Println(strconv.Itoa(n) + " bytes written")
+	}
+	err = rw.Flush()
+	if err != nil {
+		return errors.Wrap(err, "Flush failed.")
+	}
+	return nil
+}
+
+func ConstructMessage(cmd string) string {
+	msg := cmd + string(DELIM)
+	return msg
+}
+
+//request account address
+func ReceiveAccount(rw *bufio.ReadWriter) error {
+	log.Println("RequestAccount ", CMD_RANDOM_ACCOUNT)
+	return nil
+}
+
+//generic request<->reply
+func RequestReplyChan(request string, msg_in_chan chan string, msg_out_chan chan string) string {
+	msg_in_chan <- request
+	resp := <-msg_out_chan
+	return resp
+}
+
+//TODO this is higher level and should be somewhere else
 func RandomTx(account_s block.Account) block.Tx {
 	// s := cryptoutil.RandomPublicKey()
 	// address_s := cryptoutil.Address(s)
@@ -127,64 +168,9 @@ func RandomTx(account_s block.Account) block.Tx {
 	return testTx
 }
 
-func NetworkReply(rw *bufio.ReadWriter, resp string) {
-	response := EncodeReply(resp)
-	n, err := rw.WriteString(response)
-	if err != nil {
-		log.Println(err, n)
-		//err:= errors.Wrap(err, "Could not write GOB data ("+strconv.Itoa(n)+" bytes written)")
-	}
-	rw.Flush()
-}
-
-//TODO convert to chan
-func NetworkRequestReply(rw *bufio.ReadWriter, req_msg string) string {
-	//REQUEST
-	WritePipe(rw, req_msg)
-
-	//REPLY
-	resp_msg := ReadMsg(rw)
-
-	return resp_msg
-}
-
-func WritePipe(rw *bufio.ReadWriter, message string) error {
-	n, err := rw.WriteString(message)
-	if err != nil {
-		return errors.Wrap(err, "Could not write GOB data ("+strconv.Itoa(n)+" bytes written)")
-	} else {
-		log.Println(strconv.Itoa(n) + " bytes written")
-	}
-	err = rw.Flush()
-	if err != nil {
-		return errors.Wrap(err, "Flush failed.")
-	}
-	return nil
-}
-
-func ConstructMessage(cmd string) string {
-	//delim := "\n"
-	msg := cmd + string(DELIM)
-	return msg
-}
-
-//request account address
-func RequestAccount(rw *bufio.ReadWriter) error {
-	log.Println("RequestAccount ", CMD_RANDOM_ACCOUNT)
-	msg := ConstructMessage(CMD_RANDOM_ACCOUNT)
-	error := WritePipe(rw, msg)
-	return error
-}
-
-//request account address
-func ReceiveAccount(rw *bufio.ReadWriter) error {
-	log.Println("RequestAccount ", CMD_RANDOM_ACCOUNT)
-	return nil
-}
-
-//generic request<->reply
-func RequestReplyChan(request string, msg_in_chan chan string, msg_out_chan chan string) string {
-	msg_in_chan <- request
-	resp := <-msg_out_chan
-	return resp
-}
+//request random account address
+// func RequestRandomAccount(rw *bufio.ReadWriter) error {
+// 	msg := ConstructMessage(CMD_RANDOM_ACCOUNT)
+// 	error := NetworkWrite(rw, msg)
+// 	return error
+// }

@@ -238,7 +238,8 @@ func ReplyLoop(rw *bufio.ReadWriter, req_chan chan string, rep_chan chan string)
 		//take from reply channel and send over network
 		reply := <-rep_chan
 		nlog.Println("msg out ", reply)
-		protocol.NetworkReply(rw, reply)
+		response := protocol.EncodeReply(reply)
+		protocol.NetworkWrite(rw, response)
 
 	}
 }

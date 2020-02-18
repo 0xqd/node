@@ -206,11 +206,7 @@ func main() {
 		log.Println("Error:", errors.WithStack(err))
 	}
 
-	// //sub loop
-	// for {
-	// 	msg = strings.Trim(msg, string(protocol.DELIM))
-	// 	time.Sleep(2 * time.Second)
-	// }
+	//sub loop
 
 	msg_in_chan := make(chan string)
 	msg_out_chan := make(chan string)
@@ -256,17 +252,5 @@ func main() {
 		err = MakeRandomTx(msg_in_chan, msg_out_chan)
 		return
 	}
-	// else if *optionPtr == "pushtx" {
-	// 	//read locally created tx file and push it to server
-	// 	data, _ := ioutil.ReadFile("tx.json")
-	// 	log.Println(string(data))
-	// 	var tx block.Tx
-	// 	if err := json.Unmarshal(data, &tx); err != nil {
-	// 		panic(err)
-	// 	}
-	// 	log.Println(">> ", tx)
-
-	// 	return
-	// }
 
 }
