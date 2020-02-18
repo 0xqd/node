@@ -154,6 +154,7 @@ func client(ip string) (*bufio.ReadWriter, error) {
 
 type Configuration struct {
 	ServerAddress string
+	PeerAddresses []string
 }
 
 func readdns() {
@@ -200,6 +201,7 @@ func main() {
 		fmt.Println("error:", err)
 	}
 	fmt.Println("ServerAddress: ", configuration.ServerAddress)
+	fmt.Println("PeerAddresses: ", configuration.PeerAddresses)
 
 	//if exists
 	// dat, _ := ioutil.ReadFile("keys.txt")
